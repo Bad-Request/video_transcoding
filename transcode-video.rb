@@ -257,6 +257,19 @@ Requires `HandBrakeCLI` and `ffprobe`.
           fail UsageError, "unsupported HandBrakeCLI option name: #{name}"
         end
 
+        unless value.nil?
+          case name
+          when 'verbose', 'comb-detect', 'deinterlace', 'bwdif',
+            'decomb', 'detelecine', 'hqdn3d', 'denoise', 'nlmeans',
+            'chroma-smooth', 'unsharp', 'lapsharp', 'deblock', 'rotate',
+            'subtitle-forced', 'subtitle-burned', 'subtitle-default',
+            'srt-default', 'srt-burn', 'ssa-default', 'ssa-burn',
+            'qsv-async-depth', 'qsv-adapter'
+            name = "#{name}=#{value}"
+            value = nil
+          end
+        end
+
         @extra_options[name] = value
       end
     end
