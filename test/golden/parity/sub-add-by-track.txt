@@ -1,0 +1,25 @@
+# argv
+--input
+media/mixed-subtitles.mkv
+--output
+mixed-subtitles.mkv
+--multi-pass
+--turbo
+--encoder
+x264
+--vb
+2500
+--rate
+60
+--crop-mode
+conservative
+--audio
+1
+--aencoder
+copy
+--subtitle
+2
+--subname
+Full
+--encopts
+vbv-maxrate=7500:vbv-bufsize=7500

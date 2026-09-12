@@ -1,0 +1,21 @@
+# argv
+-loglevel
+error
+-stats
+-i
+media/bluray-1080p-forced.mkv
+-c:v
+copy
+-c:a
+copy
+-map
+0:0
+-map
+0:1
+-map
+0:2
+-c:s:0
+mov_text
+-movflags
+disable_chpl
+bluray-1080p-forced.mp4

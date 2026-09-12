@@ -1,0 +1,23 @@
+# argv
+--input
+media/uhd-hdr.mkv
+--output
+uhd-hdr.mkv
+--encoder
+svt_av1_10bit
+--encoder-preset
+8
+--quality
+30
+--rate
+60
+--crop-mode
+conservative
+--audio
+1
+--aencoder
+opus
+--ab
+320
+--mixdown
+5point1

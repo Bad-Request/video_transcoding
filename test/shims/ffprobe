@@ -1,0 +1,11 @@
+#!/bin/sh
+# Stand-in for ffprobe: ignores its options, treats the last argument as the
+# input path, and prints the fixture matching that path's basename.
+eval last=\${$#}
+name=$(basename "$last"); name=${name%.*}
+fixtures=${VT_FIXTURES:-$(dirname "$0")/../fixtures}
+if [ ! -f "$fixtures/$name.json" ]; then
+  echo "$last: No such file or directory" >&2
+  exit 1
+fi
+cat "$fixtures/$name.json"

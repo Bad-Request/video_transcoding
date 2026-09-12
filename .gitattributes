@@ -1,0 +1,21 @@
+# PowerShell scripts must have LF endings so that the `#!/usr/bin/env pwsh`
+# shebang works on Linux and macOS. A CRLF-terminated shebang makes the
+# kernel look for an interpreter literally named `pwsh\r`.
+*.ps1   text eol=lf
+*.psm1  text eol=lf
+*.psd1  text eol=lf
+*.ps1xml text eol=lf
+
+# Test shims are executed directly and have the same constraint.
+test/shims/** text eol=lf
+
+# Fixtures and goldens are compared byte-for-byte; never normalise them.
+test/fixtures/*.json -text
+test/golden/**/*.txt -text
+
+*.rb    text eol=lf
+*.md    text eol=lf
+
+# Batch wrappers are executed by cmd.exe and must keep CRLF. This rule comes
+# last so it overrides the test/shims/** rule above.
+*.cmd   text eol=crlf

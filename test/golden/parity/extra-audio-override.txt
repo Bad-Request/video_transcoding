@@ -1,0 +1,18 @@
+# argv
+--input
+media/multitrack.mkv
+--output
+multitrack.mkv
+--multi-pass
+--turbo
+--encoder
+x264
+--vb
+5000
+--rate
+60
+--crop-mode
+conservative
+--all-audio
+--encopts
+vbv-maxrate=15000:vbv-bufsize=15000

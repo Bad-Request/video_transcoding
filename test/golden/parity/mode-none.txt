@@ -1,0 +1,20 @@
+# argv
+--input
+media/bluray-1080p-forced.mkv
+--output
+bluray-1080p-forced.mkv
+--rate
+60
+--crop-mode
+conservative
+--audio
+1
+--aencoder
+av_aac
+--ab
+384
+--mixdown
+5point1
+--subtitle
+1
+--subtitle-default
