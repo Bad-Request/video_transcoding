@@ -1,0 +1,23 @@
+# argv
+-loglevel
+error
+-stats
+-i
+media/multitrack.mkv
+-c:v
+copy
+-c:a
+copy
+-map
+0:0
+-map
+0:1
+-map
+0:2
+-map
+0:3
+-map
+0:4
+-movflags
+disable_chpl
+multitrack.mp4

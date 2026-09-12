@@ -1,0 +1,20 @@
+# argv
+--input
+media/bluray-1080p-forced.mkv
+--output
+<TEMPFILE>
+--format
+av_mkv
+--stop-at
+seconds:1
+--crop-mode
+conservative
+--encoder
+x265_10bit
+--encoder-preset
+ultrafast
+--audio
+0
+
+# stdout
+140:140:0:0

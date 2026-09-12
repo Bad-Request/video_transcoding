@@ -1,0 +1,11 @@
+#!/bin/sh
+# Stand-in for HandBrakeCLI: records argv, then emits a scan line on stderr in
+# the exact shape detect-crop's crop regex looks for.
+if [ -n "$VT_ARGV_LOG" ]; then
+  for a in "$@"; do printf '%s\n' "$a" >> "$VT_ARGV_LOG"; done
+fi
+crop=${VT_CROP:-140/140/0/0}
+echo "[15:04:05] Scanning title 1 of 1..." >&2
+echo "  + size: 1920x1080, pixel aspect: 1/1, display aspect: 1.78, crop ($crop): 23.976 fps" >&2
+echo "[15:04:05] scan: done. 1 valid title(s)" >&2
+exit 0

@@ -1,0 +1,10 @@
+#!/bin/sh
+# Stand-in for ffmpeg: records argv and creates the output file so that
+# "output file already exists" checks behave realistically.
+if [ -n "$VT_ARGV_LOG" ]; then
+  for a in "$@"; do printf '%s\n' "$a" >> "$VT_ARGV_LOG"; done
+fi
+[ -n "$VT_FAIL" ] && { echo "ffmpeg shim: failing on request" >&2; exit "$VT_FAIL"; }
+eval out=\${$#}
+case "$out" in -*) ;; *) : > "$out" ;; esac
+exit 0
