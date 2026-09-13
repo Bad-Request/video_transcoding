@@ -147,10 +147,6 @@ Be aware that, like other Nvidia encoders, `nvenc_av1_10bit` can only produce HD
 
 `transcode-video.ps1` has around twenty options. The `HandBrakeCLI` API has over a hundred. It's YUUUUUGE! And you can pass arguments straight to that API with `-Extra`.
 
-Output MP4 instead of Matroska:
-
-    ./transcode-video.ps1 -Extra format=av_mp4 C:\Rips\Movie.mkv
-
 Tweak a crop instead of relying on `HandBrakeCLI`'s algorithm:
 
     ./transcode-video.ps1 -Extra crop=140:140:0:0 C:\Rips\Movie.mkv
@@ -175,13 +171,25 @@ Pass several at once — from a PowerShell prompt, since this is a list:
 
     ./transcode-video.ps1 -Extra detelecine,no-multi-pass C:\Rips\Movie.mkv
 
+## Output format
+
+Matroska is the default. `-Format` picks another container:
+
+    ./transcode-video.ps1 C:\Rips\Movie.mkv -Format mp4
+    ./transcode-video.ps1 C:\Rips\Movie.mkv -Format webm
+
+The value tab-completes, and the output file gets the matching extension. This
+is shorthand for `-Extra format=av_mp4`, which still works; giving both is an
+error rather than one silently winning.
+
 ## MP4 faststart
 
-MP4 output gets its index moved to the front of the file, so it can start playing before it has fully downloaded. `transcode-video.ps1` does this with HandBrake's `--optimize`; `convert-video.ps1` does it with ffmpeg's `-movflags +faststart`.
+MP4 output gets its index moved to the front of the file, so it can start playing before it has fully downloaded. `transcode-video.ps1` does this with HandBrake's `--optimize` whenever `-Format mp4` is in play; `convert-video.ps1` does it with ffmpeg's `-movflags +faststart`.
 
 It costs a second pass over the finished file, which on a large remux means rewriting every byte again. Turn it off with `-NoFaststart` when you are working locally and nothing will ever stream the result:
 
     ./convert-video.ps1 C:\Rips\Movie.mkv -NoFaststart
+    ./transcode-video.ps1 C:\Rips\Movie.mkv -Format mp4 -NoFaststart
 
 Matroska output is unaffected — it has no such index.
 

@@ -82,6 +82,28 @@ $RepoRoot = Split-Path $TestRoot -Parent
 
 $cases = Import-PowerShellDataFile (Join-Path $TestRoot 'cases.psd1')
 
+if ($Implementation -eq 'ruby' -and
+        -not (Get-Command $RubyCommand -CommandType Application -ErrorAction Ignore)) {
+    # Ruby was only ever needed to record the baseline, and is expected to be
+    # absent once that is done. Say so once, rather than failing every case
+    # with "the term 'ruby' is not recognized".
+    throw @"
+Ruby is not on PATH, so the reference implementation cannot be run.
+
+That is the normal state of things: Ruby was needed once, to record the
+goldens from legacy/*.rb, and the goldens are the specification now. Check
+the port instead:
+
+    ./test/Compare-Golden.ps1 -Implementation powershell
+
+To re-record the baseline you would need Ruby back:
+
+    winget install RubyInstallerTeam.Ruby.3.4
+
+or point -RubyCommand at an interpreter elsewhere.
+"@
+}
+
 # Shims first, so the tools under test reach the fakes rather than the real
 # binaries. VT_FIXTURES tells the ffprobe shim where to look.
 $env:PATH = (Join-Path $TestRoot 'shims') + [System.IO.Path]::PathSeparator + $env:PATH
