@@ -109,6 +109,99 @@ function Get-ToolInvocation {
     return @{ Command = 'pwsh'; Leading = @('-NoProfile', '-NonInteractive', '-File', $script) }
 }
 
+# How each GNU-style option in cases.psd1 maps onto the port's native
+# parameter. The case file stays in GNU spelling because that is what the
+# reference implementation needs; the port takes PowerShell parameters, so the
+# harness translates on the way in.
+#
+# This does not weaken the comparison: what the goldens record is the argv
+# handed to HandBrakeCLI or ffmpeg, so the two implementations can be driven
+# through different front doors and still be held to the same output.
+$script:NativeParameter = @{
+    'debug'          = @{ Native = 'Debug';         Switch = $true }
+    'dry-run'        = @{ Native = 'DryRun';        Switch = $true }
+    'mode'           = @{ Native = 'Mode' }
+    'preset'         = @{ Native = 'Preset' }
+    'bitrate'        = @{ Native = 'Bitrate' }
+    'quality'        = @{ Native = 'Quality' }
+    'no-bframe-refs' = @{ Native = 'NoBframeRefs';  Switch = $true }
+    'no-faststart'   = @{ Native = 'NoFaststart';   Switch = $true }
+    'audio-mode'     = @{ Native = 'AudioMode' }
+    'add-audio'      = @{ Native = 'AddAudio';      Repeatable = $true }
+    'ac3-surround'   = @{ Native = 'Ac3Surround';   Switch = $true }
+    'aac-encoder'    = @{ Native = 'AacEncoder' }
+    'burn-subtitle'  = @{ Native = 'BurnSubtitle' }
+    'add-subtitle'   = @{ Native = 'AddSubtitle';   Repeatable = $true }
+    'extra'          = @{ Native = 'Extra';         Repeatable = $true }
+}
+
+$script:ShortParameter = @{
+    'n' = 'dry-run'; 'm' = 'mode'; 'p' = 'preset'; 'b' = 'bitrate'
+    'q' = 'quality'; 'a' = 'audio-mode'; 'x' = 'extra'
+}
+
+function ConvertTo-NativeArgument {
+    <#
+        Rewrites a case's GNU-style arguments into the port's parameters.
+
+        Repeated options collapse into one comma-joined array argument, which
+        is how PowerShell binds [string[]] across a `pwsh -File` boundary.
+        No value in the sweep contains a comma, and one that did would need
+        passing differently.
+    #>
+    param([string[]] $Argument)
+
+    $values = [ordered] @{}
+    $switches = [System.Collections.Generic.List[string]]::new()
+    $index = 0
+
+    while ($index -lt $Argument.Count) {
+        $token = $Argument[$index]
+        $index++
+
+        $long = if ($token.StartsWith('--')) {
+            $token.Substring(2)
+        } elseif ($token.StartsWith('-') -and $token.Length -eq 2) {
+            $script:ShortParameter[$token.Substring(1)]
+        } else {
+            throw "case argument is not an option: $token"
+        }
+
+        if (-not $long -or -not $script:NativeParameter.ContainsKey($long)) {
+            throw "no native parameter is mapped for: $token"
+        }
+
+        $mapping = $script:NativeParameter[$long]
+
+        if ($mapping.ContainsKey('Switch')) {
+            $switches.Add("-$($mapping.Native)")
+            continue
+        }
+
+        $value = $Argument[$index]
+        $index++
+
+        if ($mapping.ContainsKey('Repeatable')) {
+            if ($values.Contains($mapping.Native)) {
+                $values[$mapping.Native] = $values[$mapping.Native] + ',' + $value
+            } else {
+                $values[$mapping.Native] = $value
+            }
+        } else {
+            $values[$mapping.Native] = $value
+        }
+    }
+
+    $native = [System.Collections.Generic.List[string]]::new()
+    foreach ($switch in $switches) { $native.Add($switch) }
+    foreach ($entry in $values.GetEnumerator()) {
+        $native.Add("-$($entry.Key)")
+        $native.Add($entry.Value)
+    }
+
+    $native.ToArray()
+}
+
 function ConvertTo-StableArgv {
     <#
         Replaces machine- and run-specific paths with placeholders so the
@@ -152,11 +245,21 @@ function Invoke-Case {
         normalised record of what it did: the argv it handed to the native
         tool, and anything it printed to stdout.
     #>
-    param([string] $CaseName, [hashtable] $Case)
+    param([string] $CaseName, [hashtable] $Case, [string[]] $ExtraArgument = @())
 
     $invocation = Get-ToolInvocation -Tool $Case.Tool
 
-    $arguments = @($invocation.Leading) + $Case.Arguments
+    # The reference implementation takes the case arguments as written; the
+    # port takes PowerShell parameters.
+    $caseArguments = if ($Implementation -eq 'ruby') {
+        $Case.Arguments
+    } else {
+        ConvertTo-NativeArgument -Argument $Case.Arguments
+    }
+
+    if ($ExtraArgument) { $caseArguments = @($caseArguments) + $ExtraArgument }
+
+    $arguments = @($invocation.Leading) + $caseArguments
 
     # A relative, forward-slashed input path. It never has to exist - the
     # ffprobe shim resolves the fixture from its basename - and keeping it
@@ -265,6 +368,12 @@ function Get-GoldenPath {
 
 $selected = $cases.GetEnumerator() |
     Where-Object { $_.Key -like $Name } |
+    Where-Object {
+        # Some cases exist only to pin down order-dependent behaviour that
+        # named PowerShell parameters cannot express. They stay in the file,
+        # with a NativeBehaviour note saying what the port does instead.
+        $Implementation -eq 'ruby' -or -not $_.Value.ContainsKey('SkipNative')
+    } |
     Sort-Object Key
 
 if (-not $selected) {
@@ -314,6 +423,28 @@ foreach ($entry in $selected) {
 
     if ($actual -ceq $expected) {
         $pass++
+
+        # For a case whose only divergence is faststart, -NoFaststart must
+        # reproduce the parity golden exactly. That is a free check that the
+        # switch is wired to one thing and touches nothing else.
+        if ($Implementation -eq 'powershell' -and $case.ContainsKey('FaststartParity')) {
+            $parityPath = Join-Path $TestRoot "golden/parity/$caseName.txt"
+            $parityExpected = ([System.IO.File]::ReadAllText($parityPath) -replace "`r`n", "`n").TrimEnd()
+            $walkedBack = Invoke-Case -CaseName $caseName -Case $case -ExtraArgument '-NoFaststart'
+
+            if ($walkedBack -cne $parityExpected) {
+                $pass--
+                $fail++
+                $failures.Add(("{0} (-NoFaststart should match the parity golden)`n{1}" -f $caseName,
+                    (Format-Difference -Expected $parityExpected -Actual $walkedBack)))
+                Write-Host ("  {0,-34} FAILED -NoFaststart parity" -f $caseName) -ForegroundColor Red
+                continue
+            }
+
+            Write-Host ("  {0,-34} ok (+ -NoFaststart parity)" -f $caseName) -ForegroundColor DarkGreen
+            continue
+        }
+
         Write-Host ("  {0,-34} ok" -f $caseName) -ForegroundColor DarkGreen
     } else {
         $fail++

@@ -83,7 +83,18 @@ function Save-Fixture {
         throw "ffprobe failed ($LASTEXITCODE) on $MediaPath"
     }
 
-    $text = ($json -join "`n" | ConvertFrom-Json | ConvertTo-Json -Depth 12)
+    $parsed = $json -join "`n" | ConvertFrom-Json
+
+    # ffprobe records the absolute path it was given, which here is a
+    # throwaway temp directory with a fresh GUID in it. Left alone, every
+    # regeneration would rewrite all eight fixtures with nothing but a new
+    # scratch path - churn that hides any real change. Normalise it to the
+    # name the harness actually passes. Nothing under test reads this field.
+    if ($parsed.PSObject.Properties.Name -contains 'format') {
+        $parsed.format.filename = "media/$Name" + [System.IO.Path]::GetExtension($MediaPath)
+    }
+
+    $text = ($parsed | ConvertTo-Json -Depth 12)
     $target = Join-Path $FixturePath "$Name.json"
 
     # LF, no BOM, trailing newline - matches the .gitattributes -text rule.
