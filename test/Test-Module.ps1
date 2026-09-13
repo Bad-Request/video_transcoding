@@ -202,6 +202,63 @@ Test-Case 'programs that exist pass' {
     Test-Prerequisite 'ffprobe', 'ffmpeg', 'HandBrakeCLI'
 }
 
+Write-Host "`nComment-based help" -ForegroundColor Cyan
+
+# This is a regression guard, and the regression it guards against is silent.
+#
+# A script whose help block is not separated from its `#!/usr/bin/env pwsh`
+# shebang by a blank line gets NO comment-based help at all: PowerShell reads
+# the two as one contiguous comment attached to nothing. Get-Help still
+# succeeds - it just returns auto-generated syntax instead of the
+# documentation, so nothing looks broken until someone reads it.
+$scriptRoot = Split-Path $PSScriptRoot -Parent
+
+foreach ($scriptName in 'transcode-video.ps1', 'detect-crop.ps1', 'convert-video.ps1') {
+    $scriptPath = Join-Path $scriptRoot $scriptName
+
+    Test-Case "$scriptName has a real synopsis, not generated syntax" {
+        $synopsis = (Get-Help $scriptPath).Synopsis
+
+        # The generated fallback is the syntax line, which always starts with
+        # the script's own filename.
+        if ($synopsis -like "$scriptName*") {
+            throw "comment-based help was not found; Get-Help fell back to syntax: $synopsis"
+        }
+        if (-not $synopsis.Trim()) { throw 'synopsis is empty' }
+    }
+
+    Test-Case "$scriptName renders every -Full section" {
+        $rendered = Get-Help $scriptPath -Full | Out-String
+
+        foreach ($section in 'SYNOPSIS', 'SYNTAX', 'DESCRIPTION', 'PARAMETERS',
+                             'INPUTS', 'OUTPUTS', 'NOTES', 'RELATED LINKS') {
+            if ($rendered -notmatch "(?m)^\s*$section\s*$") {
+                throw "missing section: $section"
+            }
+        }
+    }
+
+    Test-Case "$scriptName documents every parameter it declares" {
+        $declared = (Get-Command $scriptPath).Parameters.Keys |
+            Where-Object { $_ -notin [System.Management.Automation.PSCmdlet]::CommonParameters -and
+                           $_ -notin [System.Management.Automation.PSCmdlet]::OptionalCommonParameters }
+
+        $documented = @((Get-Help $scriptPath -Full).parameters.parameter.name)
+
+        $undocumented = $declared | Where-Object { $_ -notin $documented }
+        if ($undocumented) {
+            throw "undocumented parameter(s): $($undocumented -join ', ')"
+        }
+    }
+
+    Test-Case "$scriptName has worked examples" {
+        $examples = @((Get-Help $scriptPath -Full).examples.example)
+        if ($examples.Count -lt 2) {
+            throw "expected at least 2 examples, found $($examples.Count)"
+        }
+    }
+}
+
 Write-Host ''
 Write-Host "$script:Pass passed, $script:Fail failed."
 

@@ -1,4 +1,9 @@
 #!/usr/bin/env pwsh
+
+# The blank line above is load-bearing. Without it PowerShell reads the
+# shebang and the help block below as one contiguous comment attached to
+# nothing, and Get-Help silently falls back to auto-generated syntax.
+
 <#
 .SYNOPSIS
     Convert a media file between Matroska and MP4 without transcoding.
@@ -37,14 +42,45 @@
 
 .EXAMPLE
     ./convert-video.ps1 'C:\Rips\Movie.mkv'
-    Produces Movie.mp4 in the current directory.
+
+    Remux Matroska to MP4. Produces Movie.mp4 in the current directory,
+    in seconds rather than hours, because nothing is re-encoded.
+
+.EXAMPLE
+    ./convert-video.ps1 'C:\Rips\Movie.mp4'
+
+    The other direction. Anything that is not Matroska becomes Matroska,
+    which carries essentially any subtitle format, so nothing is dropped.
 
 .EXAMPLE
     ./convert-video.ps1 'C:\Rips\Movie.mkv' -WhatIf
-    Show the ffmpeg command without running it.
+
+    Print the ffmpeg command without running it.
+
+.EXAMPLE
+    Get-ChildItem 'C:\Rips\*.mkv' | ./convert-video.ps1 -NoFaststart
+
+    Convert a directory without moving each index to the front. Faststart
+    costs a second pass over the finished file, which on a large archive
+    means rewriting every byte again for a benefit only streaming sees.
+
+.INPUTS
+    System.String[]
+
+    File paths, by value or by the FullName property.
+
+.OUTPUTS
+    None by default; the converted file is the result.
+
+    With -DryRun or -WhatIf, the ffmpeg command line as a string.
 
 .NOTES
     Requires ffmpeg and ffprobe.
+.LINK
+    transcode-video.ps1
+
+.LINK
+    https://github.com/Bad-Request/video_transcoding
 #>
 [CmdletBinding(DefaultParameterSetName = 'Convert', SupportsShouldProcess)]
 param(
