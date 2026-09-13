@@ -87,13 +87,26 @@
         Tool = 'transcode-video'; Fixture = 'uhd-hdr'; Arguments = @('--mode', 'hevc', '--quality', '26')
     }
     'rate-bitrate-then-quality' = @{
-        # Last one wins, and clears the other.
+        # In Ruby the last option wins and clears the other, so this emits
+        # --quality 22 while rate-quality-then-bitrate emits --vb 4000. The
+        # ONLY difference between them is argument order.
+        #
+        # Named PowerShell parameters have no order, so the port cannot
+        # reproduce that and should not try. -Bitrate and -Quality go in
+        # mutually exclusive parameter sets instead, and PowerShell refuses
+        # the combination at bind time - which is a better answer than
+        # silently honouring whichever was typed last.
         Tool = 'transcode-video'; Fixture = 'bluray-1080p-forced'
         Arguments = @('--bitrate', '4000', '--quality', '22')
+        NativeBehaviour = 'Rejected at bind time: -Bitrate and -Quality are mutually exclusive.'
+        SkipNative = $true
     }
     'rate-quality-then-bitrate' = @{
+        # See rate-bitrate-then-quality. Identical to it once order is gone.
         Tool = 'transcode-video'; Fixture = 'bluray-1080p-forced'
         Arguments = @('--quality', '22', '--bitrate', '4000')
+        NativeBehaviour = 'Rejected at bind time: -Bitrate and -Quality are mutually exclusive.'
+        SkipNative = $true
     }
     'preset-av1' = @{
         Tool = 'transcode-video'; Fixture = 'uhd-hdr'; Arguments = @('--mode', 'av1', '--preset', '4')
@@ -203,9 +216,14 @@
         Tool = 'transcode-video'; Fixture = 'mixed-subtitles'; Arguments = @('--add-subtitle', 'Signs')
     }
     'sub-add-disables-burn' = @{
-        # --add-subtitle clears a previously requested burn.
+        # In Ruby --add-subtitle clears a previously requested burn, which is
+        # an order-dependent rule. Named parameters have no order, so the port
+        # applies it as a precedence rule instead: -AddSubtitle always wins
+        # over -BurnSubtitle, whichever way round they are typed. That happens
+        # to match this case's Ruby output, so it stays a parity case.
         Tool = 'transcode-video'; Fixture = 'bluray-1080p-pgs'
         Arguments = @('--burn-subtitle', '1', '--add-subtitle', '1')
+        NativeBehaviour = '-AddSubtitle takes precedence over -BurnSubtitle regardless of order.'
     }
     'sub-forced-late-add-all' = @{
         # The forced track is subtitle 3, and get_subtitle_options always puts
@@ -293,6 +311,10 @@
     'convert-mkv-to-mp4' = @{
         Tool = 'convert-video'; Fixture = 'bluray-1080p-forced'; Arguments = @()
         Diverges = 'faststart: -movflags +faststart+disable_chpl'
+        # Faststart is the ONLY divergence here, so running with -NoFaststart
+        # must reproduce the parity golden byte for byte. The harness checks
+        # that automatically.
+        FaststartParity = $true
     }
     'convert-mkv-mixed-subtitles' = @{
         # The defect case: an ASS track is dropped before a subrip track is
@@ -307,6 +329,7 @@
     'convert-multitrack' = @{
         Tool = 'convert-video'; Fixture = 'multitrack'; Arguments = @()
         Diverges = 'faststart'
+        FaststartParity = $true
     }
 
     # -----------------------------------------------------------------

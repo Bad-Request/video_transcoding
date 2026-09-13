@@ -1,0 +1,28 @@
+# argv
+-loglevel
+error
+-stats
+-i
+media/mixed-subtitles.mkv
+-c:v
+copy
+-c:a
+copy
+-map
+0:0
+-map
+0:1
+-map
+0:3
+-c:s:0
+mov_text
+-map
+0:4
+-c:s:1
+copy
+-movflags
++faststart+disable_chpl
+mixed-subtitles.mp4
+
+# stdout
+WARNING: Ignoring subtitle track #1 (ass)
