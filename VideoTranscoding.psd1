@@ -14,6 +14,8 @@
     FunctionsToExport = @(
         'Get-MediaInfo'
         'Select-MediaStream'
+        'Get-StreamTag'
+        'Get-StreamDisposition'
         'Format-CommandLine'
         'Format-Elapsed'
         'Invoke-NativeTool'
