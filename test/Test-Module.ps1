@@ -259,6 +259,69 @@ foreach ($scriptName in 'transcode-video.ps1', 'detect-crop.ps1', 'convert-video
     }
 }
 
+Write-Host "`n-Format" -ForegroundColor Cyan
+
+# -Format is sugar for -Extra format=av_<name>. These assert that it really is
+# sugar - same argv, not a parallel implementation that can drift - and that
+# the two spellings together are refused rather than one silently winning.
+$transcode = Join-Path (Split-Path $PSScriptRoot -Parent) 'transcode-video.ps1'
+$fixtureDir = Join-Path $PSScriptRoot 'fixtures'
+$shimDir = Join-Path $PSScriptRoot 'shims'
+
+function Invoke-Transcode {
+    # Hashtable splatting, not array splatting: an array of "-Name", "value"
+    # pairs is not reliably rebound to parameter names on the way through.
+    param([hashtable] $Parameter = @{})
+
+    $previousPath = $env:PATH
+    $previousFixtures = $env:VT_FIXTURES
+    $env:PATH = $shimDir + [System.IO.Path]::PathSeparator + $env:PATH
+    $env:VT_FIXTURES = $fixtureDir
+    try {
+        (& $transcode @Parameter -Path 'media/bluray-1080p-forced.mkv' -DryRun 2>$null) -join ' '
+    } finally {
+        $env:PATH = $previousPath
+        $env:VT_FIXTURES = $previousFixtures
+    }
+}
+
+Test-Case '-Format mp4 matches -Extra format=av_mp4 exactly' {
+    Assert-Equal (Invoke-Transcode @{ Extra = 'format=av_mp4' }) (Invoke-Transcode @{ Format = 'mp4' })
+}
+
+Test-Case '-Format mkv matches -Extra format=av_mkv exactly' {
+    Assert-Equal (Invoke-Transcode @{ Extra = 'format=av_mkv' }) (Invoke-Transcode @{ Format = 'mkv' })
+}
+
+Test-Case '-Format webm matches -Extra format=av_webm exactly' {
+    Assert-Equal (Invoke-Transcode @{ Extra = 'format=av_webm' }) (Invoke-Transcode @{ Format = 'webm' })
+}
+
+Test-Case '-Format mp4 turns on faststart' {
+    if ((Invoke-Transcode @{ Format = 'mp4' }) -notmatch '--optimize') {
+        throw 'expected --optimize'
+    }
+}
+
+Test-Case '-Format mp4 -NoFaststart leaves it off' {
+    if ((Invoke-Transcode @{ Format = 'mp4'; NoFaststart = $true }) -match '--optimize') {
+        throw 'did not expect --optimize'
+    }
+}
+
+Test-Case 'omitting -Format emits no --format at all' {
+    # The default must stay invisible, or every existing golden would move.
+    if ((Invoke-Transcode) -match '--format') { throw 'did not expect --format' }
+}
+
+Test-Case '-Format and -Extra format= together are refused' {
+    Assert-Throws { Invoke-Transcode @{ Format = 'mp4'; Extra = 'format=av_mp4' } } '*not both*'
+}
+
+Test-Case 'an unknown -Format value is refused by ValidateSet' {
+    Assert-Throws { Invoke-Transcode @{ Format = 'avi' } } '*ValidateSet*'
+}
+
 Write-Host ''
 Write-Host "$script:Pass passed, $script:Fail failed."
 

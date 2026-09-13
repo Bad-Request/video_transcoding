@@ -42,6 +42,13 @@ The subtitle counter advanced for tracks that were dropped as well as tracks tha
 
 `--subtitle-default` is documented by HandBrake as "an index into the subtitle list specified with `--subtitle`", but the absolute input track number was being passed. On a disc whose forced subtitle was not track 1, this flagged the wrong track — or an index past the end of the list. Because the forced track is always placed first in the selection, the correct value is always `1`.
 
+### Added: `-Format`
+
+`-Format mkv|mp4|webm` picks the output container directly, instead of
+`-Extra format=av_mp4`. The value tab-completes and is validated, and the
+output file gets the matching extension. The long form still works; giving
+both is an error rather than one silently winning.
+
 ### Changed: MP4 output starts with its index
 
 MP4 output now has its index moved to the front of the file so it can begin playing before it has fully downloaded — `--optimize` for HandBrake, `-movflags +faststart` for ffmpeg. This costs a second pass over the finished file, so `-NoFaststart` turns it off. Matroska output is unaffected.

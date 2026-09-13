@@ -83,6 +83,15 @@
 
     Takes precedence over -BurnSubtitle whichever order they are given in.
 
+.PARAMETER Format
+    Output container: mkv (the default), mp4 or webm.
+
+    MP4 output also has its index moved to the front of the file so it can
+    start playing before it has fully downloaded; -NoFaststart turns that off.
+
+    Equivalent to -Extra format=av_mp4 and friends, which still work. Giving
+    both is an error rather than a silent winner.
+
 .PARAMETER Extra
     Options passed straight through to HandBrakeCLI, each as NAME or
     NAME=VALUE. transcode-video has around twenty options; the HandBrakeCLI
@@ -94,8 +103,7 @@
 
 .PARAMETER NoFaststart
     Leave the MP4 index at the end of the file rather than moving it to the
-    front. Only meaningful when the output is MP4, which requires
-    -Extra format=av_mp4.
+    front. Only meaningful when the output is MP4, via -Format mp4.
 
 .PARAMETER DryRun
     Print the HandBrakeCLI command that would run, and stop. Equivalent to
@@ -152,10 +160,16 @@
     switch is belt and braces.
 
 .EXAMPLE
-    ./transcode-video.ps1 'C:\Rips\Movie.mkv' -Extra format=av_mp4
+    ./transcode-video.ps1 'C:\Rips\Movie.mkv' -Format mp4
 
     Output MP4 rather than Matroska. MP4 output also gets its index moved to
     the front of the file; -NoFaststart turns that off.
+
+.EXAMPLE
+    ./transcode-video.ps1 'C:\Rips\Movie.mkv' -Format mp4 -NoFaststart
+
+    MP4 without the index move, which costs a second pass over the finished
+    file. Worth skipping when nothing will ever stream the result.
 
 .EXAMPLE
     ./transcode-video.ps1 'C:\Rips\Movie.mkv' -Extra crop=140:140:0:0
@@ -233,6 +247,9 @@ param(
 
     [string[]] $AddSubtitle,
 
+    [ValidateSet('mkv', 'mp4', 'webm')]
+    [string] $Format,
+
     [string[]] $Extra,
 
     [switch] $NoBframeRefs,
@@ -300,6 +317,18 @@ begin {
         }
 
         $extraOptions[$name] = $value
+    }
+
+    # -Format is sugar for -Extra format=av_<name>, and is implemented by
+    # folding it into the same collection rather than as a second path to the
+    # same place. Everything downstream - the output extension, the faststart
+    # decision - already reads this, and the argv comes out identical.
+    if ($PSBoundParameters.ContainsKey('Format')) {
+        if ($extraOptions.Contains('format')) {
+            throw "use either -Format or -Extra format=..., not both"
+        }
+
+        $extraOptions['format'] = "av_$Format"
     }
 
     function Test-Extra {
@@ -785,13 +814,18 @@ process {
 
         $extension = '.mkv'
 
+        # NOT $format. PowerShell variable names are case-insensitive, so that
+        # spelling IS the $Format parameter - and its [ValidateSet] stays
+        # attached to the variable, rejecting every assignment that is not
+        # mkv, mp4 or webm. Writing "av_mp4" there breaks -Extra format=av_mp4
+        # outright.
         if ($extraOptions.Contains('format')) {
-            $format = $extraOptions['format']
-            if ($null -ne $format) {
-                if ($format -notin 'av_mkv', 'av_mp4', 'av_webm') {
-                    throw "unsupported HandBrakeCLI format: $format"
+            $containerName = $extraOptions['format']
+            if ($null -ne $containerName) {
+                if ($containerName -notin 'av_mkv', 'av_mp4', 'av_webm') {
+                    throw "unsupported HandBrakeCLI format: $containerName"
                 }
-                $extension = '.' + ($format -replace '^av_', '')
+                $extension = '.' + ($containerName -replace '^av_', '')
             }
         }
 
