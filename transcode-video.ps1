@@ -1,4 +1,9 @@
 #!/usr/bin/env pwsh
+
+# The blank line above is load-bearing. Without it PowerShell reads the
+# shebang and the help block below as one contiguous comment attached to
+# nothing, and Get-Help silently falls back to auto-generated syntax.
+
 <#
 .SYNOPSIS
     Transcode essential media tracks into a smaller, more portable format
@@ -102,18 +107,97 @@
 .EXAMPLE
     ./transcode-video.ps1 'C:\Rips\Movie.mkv'
 
+    Transcode with the defaults: H.264 video at the bitrate for the input's
+    resolution, multichannel AAC audio, automatic crop, and any forced
+    subtitle burned or included. Writes Movie.mkv to the current directory.
+
 .EXAMPLE
-    ./transcode-video.ps1 'C:\Rips\Movie.mkv' -Extra format=av_mp4
-    Output MP4 instead of Matroska.
+    Get-ChildItem 'C:\Rips\*.mkv' | ./transcode-video.ps1
+
+    Transcode a whole directory. Output lands in the current directory, so
+    run this from somewhere other than where the sources live - the tool
+    refuses to overwrite a file that already exists, and a source and its
+    output share a name.
+
+.EXAMPLE
+    ./transcode-video.ps1 'C:\Rips\Movie.mkv' -WhatIf
+
+    Print the HandBrakeCLI command this would run, and stop. The line is
+    valid PowerShell, so it can be pasted and edited.
 
 .EXAMPLE
     ./transcode-video.ps1 'C:\Rips\Movie.mkv' -Mode hevc -Quality 22
 
+    Constant-quality HEVC, for 4K HDR sources. Slow, but the only software
+    mode that can carry Dolby Vision.
+
 .EXAMPLE
-    ./transcode-video.ps1 'C:\Rips\Movie.mkv' -AddAudio 2,fra -AddSubtitle all
+    ./transcode-video.ps1 'C:\Rips\Movie.mkv' -Mode nvenc-hevc
+
+    The same territory on Nvidia hardware: much faster, slightly larger,
+    HDR10 only.
+
+.EXAMPLE
+    ./transcode-video.ps1 'C:\Rips\Movie.mkv' -AddAudio 2,fra
+
+    Keep the first audio track, plus track 2 and every French track.
+    Selectors are a track number, a three-letter language code, 'all', or
+    text matched against the track title.
+
+.EXAMPLE
+    ./transcode-video.ps1 'C:\Rips\Movie.mkv' -AddSubtitle all -BurnSubtitle none
+
+    Include every subtitle as a selectable track and burn none of them into
+    the picture. -AddSubtitle wins over -BurnSubtitle anyway, so the second
+    switch is belt and braces.
+
+.EXAMPLE
+    ./transcode-video.ps1 'C:\Rips\Movie.mkv' -Extra format=av_mp4
+
+    Output MP4 rather than Matroska. MP4 output also gets its index moved to
+    the front of the file; -NoFaststart turns that off.
+
+.EXAMPLE
+    ./transcode-video.ps1 'C:\Rips\Movie.mkv' -Extra crop=140:140:0:0
+
+    Override the automatic crop. ./detect-crop.ps1 prints values in exactly
+    this form.
+
+.EXAMPLE
+    ./transcode-video.ps1 'C:\Rips\Movie.mkv' -Extra detelecine,no-multi-pass
+
+    Pass several HandBrakeCLI options at once. Note that this list form needs
+    a PowerShell prompt or pwsh -Command; pwsh -File cannot parse it.
+
+.EXAMPLE
+    ./transcode-video.ps1 'C:\Rips\Movie.mkv' -Verbose
+
+    Show the command line and elapsed time as it works.
+
+.INPUTS
+    System.String[]
+
+    File paths, by value or by the FullName property, so output from
+    Get-ChildItem pipes in directly.
+
+.OUTPUTS
+    None by default; the transcode is the result.
+
+    With -DryRun or -WhatIf, the HandBrakeCLI command line as a string.
 
 .NOTES
     Requires HandBrakeCLI and ffprobe.
+.LINK
+    detect-crop.ps1
+
+.LINK
+    convert-video.ps1
+
+.LINK
+    https://github.com/Bad-Request/video_transcoding
+
+.LINK
+    https://handbrake.fr/docs/en/latest/cli/command-line-reference.html
 #>
 [CmdletBinding(DefaultParameterSetName = 'Bitrate', SupportsShouldProcess)]
 param(

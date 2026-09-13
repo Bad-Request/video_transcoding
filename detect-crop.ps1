@@ -1,4 +1,9 @@
 #!/usr/bin/env pwsh
+
+# The blank line above is load-bearing. Without it PowerShell reads the
+# shebang and the help block below as one contiguous comment attached to
+# nothing, and Get-Help silently falls back to auto-generated syntax.
+
 <#
 .SYNOPSIS
     Detect the unused outside area of video tracks.
@@ -31,16 +36,51 @@
 
 .EXAMPLE
     ./detect-crop.ps1 'C:\Rips\Movie.mkv'
-    140:140:0:0
+
+    Prints one line, such as 140:140:0:0 - the TOP:BOTTOM:LEFT:RIGHT values
+    to pass to transcode-video as -Extra crop=140:140:0:0.
+
+.EXAMPLE
+    ./detect-crop.ps1 'C:\Rips\Movie.mkv' -Mode auto
+
+    Use HandBrake's more aggressive algorithm. The default, conservative,
+    would rather leave a few rows of black in than clip picture.
+
+.EXAMPLE
+    Get-ChildItem 'C:\Rips\*.mkv' | ./detect-crop.ps1
+
+    Detect a whole directory. With more than one file the output becomes CSV,
+    so each crop stays attributable to its file.
 
 .EXAMPLE
     Get-ChildItem 'C:\Rips\*.mkv' | ./detect-crop.ps1 -AsObject |
         Where-Object { $_.Top -gt 0 }
 
-    Find which rips are letterboxed.
+    Find which rips are letterboxed. -AsObject emits Top, Bottom, Left and
+    Right as integers rather than a string to be parsed.
+
+.INPUTS
+    System.String[]
+
+    File paths, by value or by the FullName property.
+
+.OUTPUTS
+    System.String
+
+    TOP:BOTTOM:LEFT:RIGHT for a single file; CSV of crop and path for
+    several.
+
+    System.Management.Automation.PSCustomObject
+
+    With -AsObject: Path, Top, Bottom, Left, Right and Crop.
 
 .NOTES
     Requires HandBrakeCLI.
+.LINK
+    transcode-video.ps1
+
+.LINK
+    https://github.com/Bad-Request/video_transcoding
 #>
 [CmdletBinding(DefaultParameterSetName = 'Detect')]
 param(
