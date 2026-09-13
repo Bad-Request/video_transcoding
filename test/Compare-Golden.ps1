@@ -106,7 +106,13 @@ function Get-ToolInvocation {
     if (-not (Test-Path -LiteralPath $script)) {
         throw "port not found: $script (not written yet?)"
     }
-    return @{ Command = 'pwsh'; Leading = @('-NoProfile', '-NonInteractive', '-File', $script) }
+
+    # -Command rather than -File, deliberately. `pwsh -File script.ps1
+    # -AddAudio 2,3` binds "2,3" as ONE string: -File passes arguments as
+    # plain strings and never parses an array literal. -Command parses the
+    # line as PowerShell, which is what a user at a prompt gets, and is the
+    # only way an array-valued parameter can be exercised at all.
+    return @{ Command = 'pwsh'; Leading = @('-NoProfile', '-NonInteractive', '-Command'); Script = $script }
 }
 
 # How each GNU-style option in cases.psd1 maps onto the port's native
@@ -140,14 +146,19 @@ $script:ShortParameter = @{
     'q' = 'quality'; 'a' = 'audio-mode'; 'x' = 'extra'
 }
 
+function ConvertTo-PowerShellLiteral {
+    <# Single-quoted, with internal quotes doubled. Safe for any content. #>
+    param([string] $Value)
+    "'" + ($Value -replace "'", "''") + "'"
+}
+
 function ConvertTo-NativeArgument {
     <#
-        Rewrites a case's GNU-style arguments into the port's parameters.
+        Rewrites a case's GNU-style arguments into a PowerShell parameter
+        list, as a string to be parsed by `pwsh -Command`.
 
-        Repeated options collapse into one comma-joined array argument, which
-        is how PowerShell binds [string[]] across a `pwsh -File` boundary.
-        No value in the sweep contains a comma, and one that did would need
-        passing differently.
+        Repeated options become a comma-separated array whose elements are
+        quoted individually, so a value containing a comma stays one element.
     #>
     param([string[]] $Argument)
 
@@ -181,14 +192,12 @@ function ConvertTo-NativeArgument {
         $value = $Argument[$index]
         $index++
 
-        if ($mapping.ContainsKey('Repeatable')) {
-            if ($values.Contains($mapping.Native)) {
-                $values[$mapping.Native] = $values[$mapping.Native] + ',' + $value
-            } else {
-                $values[$mapping.Native] = $value
-            }
+        $literal = ConvertTo-PowerShellLiteral $value
+
+        if ($mapping.ContainsKey('Repeatable') -and $values.Contains($mapping.Native)) {
+            $values[$mapping.Native] = $values[$mapping.Native] + ',' + $literal
         } else {
-            $values[$mapping.Native] = $value
+            $values[$mapping.Native] = $literal
         }
     }
 
@@ -199,7 +208,7 @@ function ConvertTo-NativeArgument {
         $native.Add($entry.Value)
     }
 
-    $native.ToArray()
+    $native -join ' '
 }
 
 function ConvertTo-StableArgv {
@@ -249,23 +258,24 @@ function Invoke-Case {
 
     $invocation = Get-ToolInvocation -Tool $Case.Tool
 
-    # The reference implementation takes the case arguments as written; the
-    # port takes PowerShell parameters.
-    $caseArguments = if ($Implementation -eq 'ruby') {
-        $Case.Arguments
-    } else {
-        ConvertTo-NativeArgument -Argument $Case.Arguments
-    }
-
-    if ($ExtraArgument) { $caseArguments = @($caseArguments) + $ExtraArgument }
-
-    $arguments = @($invocation.Leading) + $caseArguments
-
     # A relative, forward-slashed input path. It never has to exist - the
     # ffprobe shim resolves the fixture from its basename - and keeping it
     # relative means the recorded argv is identical whether Ruby ran on
     # Windows, on Linux, or under WSL against /mnt/d.
-    $arguments += "media/$($Case.Fixture).mkv"
+    $inputPath = "media/$($Case.Fixture).mkv"
+
+    if ($Implementation -eq 'ruby') {
+        $arguments = @($invocation.Leading) + $Case.Arguments + $ExtraArgument + $inputPath
+    } else {
+        # One string for -Command: script path, translated parameters, input.
+        $line = (ConvertTo-PowerShellLiteral $invocation.Script),
+                (ConvertTo-NativeArgument -Argument $Case.Arguments),
+                ($ExtraArgument -join ' '),
+                (ConvertTo-PowerShellLiteral $inputPath) |
+            Where-Object { $_ }
+
+        $arguments = @($invocation.Leading) + ('& ' + ($line -join ' '))
+    }
 
     $sandbox = Join-Path ([System.IO.Path]::GetTempPath()) "vt-case-$(New-Guid)"
     $null = New-Item -ItemType Directory -Path $sandbox -Force

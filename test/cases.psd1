@@ -233,6 +233,7 @@
         # list index, this flags the wrong track as default.
         Tool = 'transcode-video'; Fixture = 'forced-late'
         Arguments = @('--add-subtitle', 'all')
+        Diverges = 'subtitle-default is a list position, not a track number'
     }
     'sub-forced-late-add-language' = @{
         # Narrower version of the same question: only the forced French track
@@ -240,6 +241,7 @@
         # where the list index would be 1.
         Tool = 'transcode-video'; Fixture = 'forced-late'
         Arguments = @('--add-subtitle', 'fra')
+        Diverges = 'subtitle-default is a list position, not a track number'
     }
     'sub-add-with-forced-default' = @{
         # The forced track is picked up first and becomes --subtitle-default.
@@ -269,6 +271,9 @@
         # Changes the output extension, and is the faststart path.
         Tool = 'transcode-video'; Fixture = 'bluray-1080p-forced'; Arguments = @('-x', 'format=av_mp4')
         Diverges = 'faststart: adds --optimize'
+        # Faststart is the only divergence, so -NoFaststart must walk it back
+        # to the parity golden exactly.
+        FaststartParity = $true
     }
     'extra-format-mkv' = @{
         Tool = 'transcode-video'; Fixture = 'bluray-1080p-forced'; Arguments = @('-x', 'format=av_mkv')
