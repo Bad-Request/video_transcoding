@@ -4,89 +4,85 @@ Tools to transcode, inspect and convert videos.
 
 ## About
 
-> [!NOTE]
-> *This decade-old project was redesigned and rewritten for the modern era of video transcoding, and then re-released in early 2025 with different behavior and incompatible APIs. Some old conveniences were removed but new features and flexibility were added. Please manage your expectations accordingly if you came here looking for the older tools.*
+> [!IMPORTANT]
+> *This is a breaking fork of [Lisa Melton's video_transcoding](https://github.com/lisamelton/video_transcoding), rewritten in PowerShell. The Ruby runtime is no longer needed, and the command-line interface is now native PowerShell rather than GNU-style: `-Mode hevc` instead of `--mode hevc`. Every example below has changed accordingly. See [CHANGELOG.md](CHANGELOG.md) for the full list of differences, including two bug fixes that change behaviour.*
 
-Hi, I'm [Lisa Melton](http://lisamelton.net/). I created these tools to transcode my collection of Blu-ray Discs and DVDs into a smaller, more portable format while remaining high enough quality to be mistaken for the originals.
+These tools transcode Blu-ray Discs and DVDs into a smaller, more portable format while remaining high enough quality to be mistaken for the originals.
 
-Most of the tools in this package are essentially intelligent wrappers around Open Source software like [HandBrake](https://handbrake.fr/) and [FFmpeg](http://ffmpeg.org/). And they're all designed to be executed from the command line shell:
+Most of them are intelligent wrappers around [HandBrake](https://handbrake.fr/) and [FFmpeg](http://ffmpeg.org/), designed to be run from a command line:
 
-* `transcode-video.rb`
+* `transcode-video.ps1`
 Transcode essential media tracks into a smaller, more portable format while remaining high enough quality to be mistaken for the original.
 
-* `detect-crop.rb`
-Detect the unused outside area of video tracks and print TOP:BOTTOM:LEFT:RIGHT crop values to standard output.
+* `detect-crop.ps1`
+Detect the unused outside area of video tracks and print TOP:BOTTOM:LEFT:RIGHT crop values.
 
-* `convert-video.rb`
-Convert a media file from Matroska `.mkv` format to MP4 format or other media to Matroksa format without transcoding.
+* `convert-video.ps1`
+Convert a media file from Matroska `.mkv` to MP4, or other media to Matroska, without transcoding.
 
 ## Installation
 
-> [!WARNING]
-> *Older versions of this project were packaged via [RubyGems](https://en.wikipedia.org/wiki/RubyGems) and installed via the `gem` command. If you had it installed that way, it's a good idea to uninstall that version via this command: `gem uninstall video_transcoding`*
+These tools work on Windows, Linux and macOS. Clone the repository:
 
-These tools work on Windows, Linux and macOS. They're standalone Ruby scripts which must be installed and updated manually. You can retrieve them via the command line by cloning the entire repository like this:
+    git clone https://github.com/Bad-Request/video_transcoding.git
 
-    git clone https://github.com/lisamelton/video_transcoding.git
+On Linux and macOS, make the scripts executable:
 
-Or download it directly from the GitHub website here:
+    chmod +x transcode-video.ps1 detect-crop.ps1 convert-video.ps1
 
-https://github.com/lisamelton/video_transcoding
+They carry a `#!/usr/bin/env pwsh` shebang, so they can then be run directly. Move or copy them, together with `VideoTranscoding.psd1` and `VideoTranscoding.psm1`, to a directory on your `PATH`. The two module files must stay alongside the scripts.
 
-On Linux and macOS, make sure each script is executable by setting their permissions like this:
+### Requirements
 
-    chmod +x transcode-video.rb
-    chmod +x detect-crop.rb
-    chmod +x convert-video.rb
+**PowerShell 7.4 or later.** Windows PowerShell 5.1 will not work: it lacks features these scripts rely on, and has the broken native-argument quoting this rewrite exists to stop working around. See "[Installing PowerShell](https://learn.microsoft.com/powershell/scripting/install/installing-powershell)".
 
-And then move or copy them to a directory listed in your `$env:PATH` environment variable on Windows or `$PATH` environment variable on Linux and macOS.
-
-Because they're written in Ruby, each script requires that language's runtime and interpreter. See "[Installing Ruby](https://www.ruby-lang.org/en/documentation/installation/)" if you don't have it on your platform.
-
-Additional software is required for all the scripts to function properly, specifically these command line programs:
+These command line programs must also be on your `PATH`:
 
 * `HandBrakeCLI`
 * `ffprobe`
 * `ffmpeg`
 
-See "[HandBrake Downloads (Command Line)](https://handbrake.fr/downloads2.php)" and "[Download FFmpeg](https://ffmpeg.org/download.html) to find versions for your platform.
+See "[HandBrake Downloads (Command Line)](https://handbrake.fr/downloads2.php)" and "[Download FFmpeg](https://ffmpeg.org/download.html)".
 
-On macOS, all of these programs can be easily installed via [Homebrew](http://brew.sh/), an optional package manager:
+On macOS, both are available via [Homebrew](http://brew.sh/):
 
-    brew install handbrake
-    brew install ffmpeg
+    brew install handbrake ffmpeg
 
-The `ffprobe` program is included within the `ffmpeg` package.
+On Windows, via [winget](https://learn.microsoft.com/windows/package-manager/winget/):
 
-On Windows, it's best to follow one of the two methods described here, manually installing binaries or installing into the [Windows Subsystem for Linux](https://en.wikipedia.org/wiki/Windows_Subsystem_for_Linux):
+    winget install HandBrake.HandBrake.CLI
+    winget install Gyan.FFmpeg
 
-https://github.com/JMoVS/installing_video_transcoding_on_windows
+`ffprobe` is included with `ffmpeg`.
 
 ## Usage
 
-For each tool in this package, use `--help` to list the options available for that tool along with brief instructions on their usage. For example:
+Every tool takes one or more media files:
 
-    transcode-video.rb --help
+    ./transcode-video.ps1 C:\Rips\Movie.mkv
 
-And since all of the tools take one or more media files as arguments, using them can be as simple as this on Windows:
+They accept pipeline input, which is the easy way to do a batch:
 
-    transcode-video.rb C:\Rips\Movie.mkv
+    Get-ChildItem C:\Rips\*.mkv | ./transcode-video.ps1
 
-Or this on Linux and macOS:
+Use `Get-Help` for the full list of options:
 
-    transcode-video.rb /Rips/Movie.mkv
+    Get-Help ./transcode-video.ps1 -Full
 
-## Default `transcode-video.rb` behavior
+Parameter names tab-complete, and so do the values of `-Mode`, `-AudioMode` and `-AacEncoder`.
 
-The `transcode-video.rb` tool creates a Matroska `.mkv` format file in the current working directory with video in 8-bit H.264 format and audio in multichannel AAC format.
+Use `-WhatIf` to see the `HandBrakeCLI` command a run would produce without running it:
 
-4K inputs are automatically scaled to 1080p and HDR is automatically converted to SDR color space.
+    ./transcode-video.ps1 C:\Rips\Movie.mkv -WhatIf
 
-Video is automatically cropped.
+> [!NOTE]
+> *Calling these scripts as `pwsh -File transcode-video.ps1 ...` — from a shell script, say — cannot pass a list to `-AddAudio`, `-AddSubtitle` or `-Extra`. `-File` hands arguments over as plain strings and never parses `2,3` as two values. Use `pwsh -Command` for those, or call the script from a PowerShell prompt.*
 
-The first audio track in the input, if available, is automatically selected.
+## Default `transcode-video.ps1` behavior
 
-Any forced subtitle is automatically burned into the video track or included as a separate text-only track depending on its original format.
+Creates a Matroska `.mkv` file in the current working directory with video in 8-bit H.264 and audio in multichannel AAC.
+
+4K inputs are automatically scaled to 1080p and HDR is converted to SDR. Video is automatically cropped. The first audio track, if available, is automatically selected. Any forced subtitle is automatically burned into the video track or included as a separate text-only track depending on its original format.
 
 The venerable `x264` software-based encoder is used with two-pass ratecontrol to produce a constant bitrate. Using two passes _is_ a bit slower than other methods but the output quality is worth the wait, as is the output size. This Is The Way™.
 
@@ -106,79 +102,114 @@ Surround | 384 Kbps
 Stereo | 128 Kbps
 Mono | 80 Kbps
 
-All this behavior can easily be changed by selecting different video and audio modes via the `--mode` and `--audio-mode` options, using other options like `--add-audio` or by passing arguments directly to the `HandBrakeCLI` API via the `--extra` option. It's very, very flexible.
+All of this can be changed with `-Mode` and `-AudioMode`, with options like `-AddAudio`, or by passing arguments straight to `HandBrakeCLI` via `-Extra`. It's very, very flexible.
 
 ## Other video modes
 
-While the default behavior of `transcode-video.rb` is focused on creating high-quality 1080p and smaller-resolution SDR videos, other modes are available.
+The default is focused on high-quality 1080p and smaller SDR video. Other modes are available.
 
-### `--mode hevc`
+### `-Mode hevc`
 
 Designed for 4K HDR content, this mode uses the `x265_10bit` software-based encoder with a constant quality (instead of a constant bitrate) ratecontrol system. But it's reeeeeally slow. I mean, really slow. However, it does produce high-quality output. You just have to decide whether it's worth it.
 
 One big selling point is that the `x265_10bit` encoder can produce output compatible with both the [HDR10](https://en.wikipedia.org/wiki/HDR10) and [HDR10+](https://en.wikipedia.org/wiki/HDR10%2B) standards as well as [Dolby Vision](https://en.wikipedia.org/wiki/Dolby_Vision).
 
-### `--mode nvenc-hevc`
+### `-Mode nvenc-hevc`
 
 Also designed for 4K HDR content, this mode uses the `nvenc_h265_10bit` Nvidia hardware-based encoder, also with a constant quality ratecontrol system, because you can't always afford to wait on `x265_10bit`. The output will be slightly larger and somewhat lesser in quality but you'll get it a LOT faster. A lot.
 
 But be aware that the `nvenc_h265_10bit` encoder can only produce HDR10-compatible output.
 
-### `--mode av1`
+### `-Mode av1`
 
 This Is The Future. Unfortunately, the [AV1 video format](https://en.wikipedia.org/wiki/AV1) is currently the Star Trek Future. Other than desktop PCs, most devices can't play it yet. This mode uses the `svt_av1_10bit` software-based encoder with a constant quality ratecontrol system. Although the encoder is already quite good, it's still a work in progress. But it's faster than `x265_10bit` and usually produces smaller output. So it's certainly worth a try. Especially on 4K HDR content.
 
 The `svt_av1_10bit` encoder can produce output compatible with the HDR10 and HDR10+ standards and pass through Dolby Vision metadata.
 
-When using this mode, audio output is in Opus format at slightly lower bitrates. Why Opus? Because it's higher quality than AAC and if you can play AV1 format video then you can certainly play Opus format audio.
+When using this mode, audio output is in Opus format at slightly lower bitrates. Why Opus? Because it's higher quality than AAC and if you can play AV1 format video then you can certainly play Opus format audio. An explicit `-AudioMode` always overrides that.
 
-### `--mode nvenc-av1`
+### `-Mode nvenc-av1`
 
 This mode uses the `nvenc_av1_10bit` Nvidia hardware-based encoder, also with a constant quality ratecontrol system. The output is actually about the same size as that from the software-based `svt_av1_10bit` encoder in `av1` mode, but this is MUCH faster.
 
-Be aware that, like other Nvidia encoders, `nvenc_h265_10bit` can only produce HDR10-compatible output. And like the `av1` mode, audio output is in Opus format at slightly lower bitrates.
+Be aware that, like other Nvidia encoders, `nvenc_av1_10bit` can only produce HDR10-compatible output. And like `av1` mode, audio output is in Opus format at slightly lower bitrates.
 
-> [!NOTE]
-> *An additional `--mode` argument leveraging the `vt_h265_10bit` video encoder, likely to be named `vt-hevc`, is under consideration pending ratecontrol tuning which will be delayed until I actually have an Apple Silicon Mac.*
+## Ratecontrol
 
-## Calling `HandBrakeCLI` from `transcode-video.rb`
+`-Bitrate` and `-Quality` cannot be combined; PowerShell will refuse the command. Pick the one that suits the mode:
 
-The `transcode-video.rb` tool has less than 20 options. But the `HandBrakeCLI` API has over 100. It's YUUUUUGE! And you can pass arguments directly to that API via the `--extra` option.
+    ./transcode-video.ps1 C:\Rips\Movie.mkv -Bitrate 4000
+    ./transcode-video.ps1 C:\Rips\Movie.mkv -Mode hevc -Quality 22
 
-But use the `-x` shortcut because who wants to do all that work typing `--extra`.
+`-Bitrate` tunes the default for the input resolution rather than replacing it: the value is clamped to between 80% and 160% of the figure in the table above.
 
-Even though the `convert-video.rb` tool is included in this project, you can output to MP4 format from `transcode-video.rb` itself like this:
+## Calling `HandBrakeCLI` from `transcode-video.ps1`
 
-    transcode-video.rb -x format=av_mp4 C:\Rips\Movie.mkv
+`transcode-video.ps1` has around twenty options. The `HandBrakeCLI` API has over a hundred. It's YUUUUUGE! And you can pass arguments straight to that API with `-Extra`.
 
-What if you want to tweak a crop instead of relying on `HandBrakeCLI`'s new and improved algorithm? It's as simple as:
+Output MP4 instead of Matroska:
 
-    transcode-video.rb -x crop=140:140:0:0 C:\Rips\Movie.mkv
+    ./transcode-video.ps1 -Extra format=av_mp4 C:\Rips\Movie.mkv
 
-If you want to get faster results and are willing to live dangerously when using `x264`, you can disable two-pass transcoding like this:
+Tweak a crop instead of relying on `HandBrakeCLI`'s algorithm:
 
-    transcode-video.rb -x no-multi-pass C:\Rips\Movie.mkv
+    ./transcode-video.ps1 -Extra crop=140:140:0:0 C:\Rips\Movie.mkv
 
-What about filters? Easy peasy. You can apply any of `HandBrakeCLI`'s built-in filters this way:
+Get faster results, living dangerously, by disabling two-pass transcoding:
 
-    transcode-video.rb -x detelecine C:\Rips\Movie.mkv
+    ./transcode-video.ps1 -Extra no-multi-pass C:\Rips\Movie.mkv
 
-Want to waste space? Then keep your original audio track in your output by changing the audio encoder:
+Apply any of `HandBrakeCLI`'s built-in filters:
 
-    transcode-video.rb -x aencoder=copy C:\Rips\Movie.mkv
+    ./transcode-video.ps1 -Extra detelecine C:\Rips\Movie.mkv
 
-And if you just want an excerpt of your input, you can specify a chapter range for your output:
+Waste space by keeping your original audio track:
 
-    transcode-video.rb -x chapters=3-5 C:\Rips\Movie.mkv
+    ./transcode-video.ps1 -Extra aencoder=copy C:\Rips\Movie.mkv
+
+Output only an excerpt:
+
+    ./transcode-video.ps1 -Extra chapters=3-5 C:\Rips\Movie.mkv
+
+Pass several at once — from a PowerShell prompt, since this is a list:
+
+    ./transcode-video.ps1 -Extra detelecine,no-multi-pass C:\Rips\Movie.mkv
+
+## MP4 faststart
+
+MP4 output gets its index moved to the front of the file, so it can start playing before it has fully downloaded. `transcode-video.ps1` does this with HandBrake's `--optimize`; `convert-video.ps1` does it with ffmpeg's `-movflags +faststart`.
+
+It costs a second pass over the finished file, which on a large remux means rewriting every byte again. Turn it off with `-NoFaststart` when you are working locally and nothing will ever stream the result:
+
+    ./convert-video.ps1 C:\Rips\Movie.mkv -NoFaststart
+
+Matroska output is unaffected — it has no such index.
+
+## Detecting crop values
+
+    ./detect-crop.ps1 C:\Rips\Movie.mkv
+    140:140:0:0
+
+Use `-AsObject` when a script is reading the result rather than a person:
+
+    Get-ChildItem C:\Rips\*.mkv | ./detect-crop.ps1 -AsObject |
+        Where-Object { $_.Top -gt 0 }
+
+## Testing
+
+The repository carries a golden-file harness that verifies the tools without running a single encode. See [test/README.md](test/README.md).
+
+    ./test/Compare-Golden.ps1
+    ./test/Test-Module.ps1
 
 ## Feedback
 
-Please report bugs or ask questions by [creating a new issue](https://github.com/lisamelton/video_transcoding/issues) on GitHub. I always try to respond quickly but sometimes it may take as long as 24 hours.
+Please report bugs or ask questions by [creating a new issue](https://github.com/Bad-Request/video_transcoding/issues) on GitHub.
 
 ## Acknowledgements
 
-This project would not be possible without my collaborators on the [Video Transcoding Slack](https://videotranscoding.slack.com/) who spend countless hours reviewing, testing, documenting and supporting this software.
+This project exists because of [Lisa Melton](http://lisamelton.net/), who wrote the original and spent years tuning the ratecontrol settings that make it worth using. The [Video Transcoding Slack](https://videotranscoding.slack.com/) reviewed, tested, documented and supported that work.
 
 ## License
 
-Video Transcoding is copyright [Lisa Melton](http://lisamelton.net/) and available under an [MIT license](https://github.com/lisamelton/video_transcoding/blob/master/LICENSE).
+Video Transcoding is copyright [Lisa Melton](http://lisamelton.net/) and available under an [MIT license](LICENSE).
